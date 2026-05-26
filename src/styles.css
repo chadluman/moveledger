@@ -300,6 +300,56 @@ textarea {
   gap: 18px;
 }
 
+.ops-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.ops-strip article {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.76), rgba(255, 255, 255, 0.42)),
+    rgba(255, 253, 249, 0.68);
+}
+
+.ops-strip article::after {
+  content: "";
+  position: absolute;
+  right: -42px;
+  top: -52px;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: rgba(191, 90, 54, 0.14);
+}
+
+.ops-strip span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.ops-strip strong {
+  display: block;
+  margin-top: 10px;
+  font-size: clamp(1.55rem, 3vw, 2.4rem);
+  line-height: 1;
+}
+
+.ops-strip small {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
+}
+
 .card {
   border-radius: var(--radius-lg);
   padding: 20px;
@@ -324,7 +374,7 @@ textarea {
   border-radius: 20px;
   padding: 18px;
   background: var(--surface-strong);
-  border: 1px solid rgba(29, 26, 23, 0.08);
+  border: 1px solid var(--line);
 }
 
 .move-card__header,
@@ -485,6 +535,7 @@ textarea {
   .layout,
   .hero,
   .workspace-grid,
+  .ops-strip,
   .section-grid,
   .label-card {
     grid-template-columns: 1fr;

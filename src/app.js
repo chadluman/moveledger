@@ -255,6 +255,7 @@ function renderWorkspace() {
   elements.appContent.append(elements.workspaceTemplate.content.cloneNode(true));
 
   wireWorkspaceEvents();
+  renderOpsStrip();
   renderMovesList();
   renderSearchResults("");
 }
@@ -344,6 +345,40 @@ function renderMovesList() {
   container.querySelectorAll('[data-action="toggle-move"]').forEach((button) => {
     button.addEventListener("click", () => toggleMoveDetails(button.dataset.moveId));
   });
+}
+
+function renderOpsStrip() {
+  const containers = visibleContainers();
+  const items = visibleItems();
+  const photos = visiblePhotos();
+  const readiness = containers.length
+    ? Math.round(
+        (containers.filter((container) =>
+          items.some((item) => item.containerId === container.id),
+        ).length /
+          containers.length) *
+          100,
+      )
+    : 0;
+  const coverage = containers.length
+    ? Math.round(
+        (containers.filter((container) =>
+          photos.some((photo) => photo.containerId === container.id),
+        ).length /
+          containers.length) *
+          100,
+      )
+    : 0;
+  const latestRecords = [...items, ...photos, ...containers, ...visibleMoves()]
+    .map((record) => record.createdAt || record.updatedAt)
+    .filter(Boolean)
+    .sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+
+  document.querySelector("#opsReadiness").textContent = `${readiness}%`;
+  document.querySelector("#opsCoverage").textContent = `${coverage}%`;
+  document.querySelector("#opsActivity").textContent = latestRecords[0]
+    ? formatDate(latestRecords[0])
+    : "No activity";
 }
 
 function toggleMoveDetails(moveId) {
@@ -1067,6 +1102,10 @@ function visibleItems() {
   return state.data.items.filter((record) => record.userId === state.currentUserId);
 }
 
+function visiblePhotos() {
+  return state.data.photos.filter((record) => record.userId === state.currentUserId);
+}
+
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -1087,7 +1126,8 @@ function guessRoom(container, photo) {
 
 function formatDate(value) {
   if (!value) return "No date";
-  return new Date(`${value}T00:00:00`).toLocaleDateString(undefined, {
+  const normalized = value.includes("T") ? value : `${value}T00:00:00`;
+  return new Date(normalized).toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
     year: "numeric",
