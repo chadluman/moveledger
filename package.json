@@ -1,0 +1,10 @@
+{
+  "name": "moveledger-mvp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "VS Code-ready static MVP for a moving inventory app with QR labels and AI-assisted item logging.",
+  "scripts": {
+    "start": "node server.js",
+    "serve": "node server.js"
+  }
+}

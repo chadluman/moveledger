@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MoveLedger | Smart Moving Inventory</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Manrope:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="hero">
+        <div class="hero__copy">
+          <p class="eyebrow">Moving Inventory, Search, and Accountability</p>
+          <h1>Track every container, every item, and every handoff.</h1>
+          <p class="hero__text">
+            MoveLedger gives customers a searchable packing log with printable QR
+            labels, photo-based inventory capture, and AI-assisted item lists for
+            claims, audits, and peace of mind.
+          </p>
+          <div class="hero__chips">
+            <span>Printable QR labels</span>
+            <span>Photo inventory</span>
+            <span>Move-by-move search</span>
+            <span>Insurance-ready records</span>
+          </div>
+        </div>
+        <div class="hero__card">
+          <div class="status-dot"></div>
+          <p class="hero__card-label">Today’s Snapshot</p>
+          <div class="hero__stats">
+            <div>
+              <strong id="heroMovesCount">0</strong>
+              <span>Moves</span>
+            </div>
+            <div>
+              <strong id="heroContainersCount">0</strong>
+              <span>Containers</span>
+            </div>
+            <div>
+              <strong id="heroItemsCount">0</strong>
+              <span>Items Logged</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main class="layout">
+        <section class="panel panel--auth">
+          <div class="panel__header">
+            <div>
+              <p class="eyebrow">Customer Access</p>
+              <h2 id="authTitle">Log In</h2>
+            </div>
+            <button id="toggleAuthMode" class="ghost-button" type="button">
+              Need an account?
+            </button>
+          </div>
+
+          <form id="authForm" class="stack">
+            <label id="nameField" class="field field--hidden">
+              <span>Full name</span>
+              <input id="authName" type="text" autocomplete="name" />
+            </label>
+            <label class="field">
+              <span>Email</span>
+              <input id="authEmail" type="email" autocomplete="email" required />
+            </label>
+            <label class="field">
+              <span>Password</span>
+              <input
+                id="authPassword"
+                type="password"
+                autocomplete="current-password"
+                required
+              />
+            </label>
+            <button class="primary-button" type="submit" id="authSubmit">
+              Log In
+            </button>
+          </form>
+
+          <div class="demo-note">
+            <strong>Demo mode:</strong> data is stored in your browser so you can
+            prototype the experience without a backend.
+          </div>
+        </section>
+
+        <section class="panel panel--workspace">
+          <div class="panel__header">
+            <div>
+              <p class="eyebrow">Workspace</p>
+              <h2 id="workspaceTitle">Create and manage moving inventories</h2>
+            </div>
+            <div class="workspace-actions">
+              <span id="welcomeMessage" class="welcome-message">Not signed in</span>
+              <button id="logoutButton" class="ghost-button ghost-button--danger" type="button">
+                Log Out
+              </button>
+            </div>
+          </div>
+
+          <div id="appContent" class="stack">
+            <div class="empty-state">
+              <h3>Sign in to start a move record</h3>
+              <p>
+                Once logged in, you can create a move, add containers, print QR
+                labels, upload photos, and search every logged item.
+              </p>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <template id="workspaceTemplate">
+      <div class="workspace-grid">
+        <section class="card">
+          <div class="card__header">
+            <div>
+              <p class="eyebrow">New Move</p>
+              <h3>Create a move file</h3>
+            </div>
+          </div>
+          <form id="moveForm" class="stack">
+            <label class="field">
+              <span>Move name</span>
+              <input id="moveName" type="text" placeholder="Smith PCS to Colorado Springs" required />
+            </label>
+            <label class="field">
+              <span>Origin</span>
+              <input id="moveOrigin" type="text" placeholder="Fort Hood, TX" required />
+            </label>
+            <label class="field">
+              <span>Destination</span>
+              <input id="moveDestination" type="text" placeholder="Colorado Springs, CO" required />
+            </label>
+            <label class="field">
+              <span>Move date</span>
+              <input id="moveDate" type="date" required />
+            </label>
+            <button class="primary-button" type="submit">Create Move</button>
+          </form>
+        </section>
+
+        <section class="card">
+          <div class="card__header">
+            <div>
+              <p class="eyebrow">Global Search</p>
+              <h3>Find any item fast</h3>
+            </div>
+          </div>
+          <label class="field">
+            <span>Search by item, room, notes, or container</span>
+            <input id="globalSearch" type="search" placeholder="Search lamp, uniforms, kitchen box..." />
+          </label>
+          <div id="searchResults" class="search-results empty-hint">
+            Search results will appear here.
+          </div>
+        </section>
+      </div>
+
+      <section class="card">
+        <div class="card__header">
+          <div>
+            <p class="eyebrow">AI Settings</p>
+            <h3>Optional photo analysis key</h3>
+          </div>
+        </div>
+        <form id="aiSettingsForm" class="workspace-grid">
+          <label class="field">
+            <span>OpenAI API key</span>
+            <input
+              id="openAiKey"
+              type="password"
+              placeholder="Optional: store locally in this browser only"
+            />
+          </label>
+          <div class="stack">
+            <button class="primary-button" type="submit">Save AI Key</button>
+            <small class="meta">
+              This MVP stores the key only in local browser storage. For a real
+              customer app, the key should live on a secure backend instead.
+            </small>
+          </div>
+        </form>
+      </section>
+
+      <section class="card">
+        <div class="card__header">
+          <div>
+            <p class="eyebrow">Move Records</p>
+            <h3>Your active moves</h3>
+          </div>
+        </div>
+        <div id="movesList" class="moves-list empty-hint">
+          No moves yet. Create the first move above.
+        </div>
+      </section>
+    </template>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
