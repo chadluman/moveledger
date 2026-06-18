@@ -1,16 +1,16 @@
 :root {
   --bg: #f7f1e8;
   --bg-alt: #efe5d8;
-  --surface: rgba(255, 253, 249, 0.9);
+  --surface: rgba(255, 253, 249, 0.96);
   --surface-strong: #fffdfa;
   --ink: #1d1a17;
   --muted: #6d6258;
-  --line: rgba(29, 26, 23, 0.12);
+  --line: rgba(73, 47, 29, 0.18);
   --accent: #bf5a36;
   --accent-deep: #8f3f24;
   --accent-soft: rgba(191, 90, 54, 0.12);
   --success: #2b7a57;
-  --shadow: 0 20px 45px rgba(77, 53, 31, 0.12);
+  --shadow: 0 20px 48px rgba(77, 53, 31, 0.17), 0 2px 8px rgba(77, 53, 31, 0.08);
   --radius-xl: 28px;
   --radius-lg: 20px;
   --radius-md: 14px;
@@ -48,8 +48,10 @@ textarea {
 .panel,
 .card {
   backdrop-filter: blur(18px);
-  background: var(--surface);
-  border: 1px solid rgba(255, 255, 255, 0.55);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(250, 241, 230, 0.94)),
+    var(--surface);
+  border: 1px solid rgba(116, 77, 50, 0.22);
   box-shadow: var(--shadow);
 }
 
@@ -199,6 +201,11 @@ textarea {
   transition: transform 140ms ease, background 140ms ease, box-shadow 140ms ease;
 }
 
+button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
 .ghost-button,
 .secondary-button,
 .mini-button {
@@ -263,6 +270,14 @@ textarea {
   padding: 14px 14px;
   background: rgba(255, 255, 255, 0.76);
   color: var(--ink);
+}
+
+.field input:focus-visible,
+.field select:focus-visible,
+.field textarea:focus-visible,
+button:focus-visible {
+  outline: 3px solid rgba(191, 90, 54, 0.28);
+  outline-offset: 2px;
 }
 
 .field textarea {
@@ -460,9 +475,19 @@ textarea {
 
 .label-card {
   display: grid;
-  grid-template-columns: 140px 1fr;
+  grid-template-columns: 1fr;
   gap: 16px;
   align-items: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }
 
 .label-card__actions {

@@ -1,9 +1,8 @@
-const STORAGE_KEY = "move-ledger-demo-v1";
-
 const state = {
   authMode: "login",
   currentUserId: null,
-  data: loadData(),
+  data: emptyData(),
+  savePromise: Promise.resolve(),
 };
 
 const elements = {
@@ -27,120 +26,55 @@ const elements = {
 
 initialize();
 
-function initialize() {
-  state.currentUserId = state.data.sessionUserId || null;
-
+async function initialize() {
   elements.toggleAuthMode.addEventListener("click", toggleAuthMode);
   elements.authForm.addEventListener("submit", handleAuthSubmit);
   elements.logoutButton.addEventListener("click", handleLogout);
 
-  seedDemoUser();
+  try {
+    const session = await apiRequest("/api/session");
+    if (session.user) setCustomerState(session.user, session.data);
+  } catch (error) {
+    window.alert(`MoveLedger could not connect to its backend: ${error.message}`);
+  }
   render();
 }
 
-function loadData() {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) {
-    return {
-      users: [],
-      moves: [],
-      containers: [],
-      items: [],
-      photos: [],
-      sessionUserId: null,
-      settings: {
-        openAiApiKey: "",
-      },
-    };
-  }
+function emptyData() {
+  return { users: [], moves: [], containers: [], items: [], photos: [], settings: { openAiApiKey: "" } };
+}
 
-  try {
-    return JSON.parse(raw);
-  } catch (error) {
-    console.warn("Failed to parse existing data, resetting.", error);
-    localStorage.removeItem(STORAGE_KEY);
-    return loadData();
+function setCustomerState(user, data) {
+  state.currentUserId = user.id;
+  state.data = { ...emptyData(), ...data, users: [user] };
+}
+
+async function apiRequest(url, options = {}) {
+  const response = await fetch(url, {
+    credentials: "same-origin",
+    ...options,
+    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const fallback = response.status === 404
+      ? "Backend route not found. Open MoveLedger through its Node server, not VS Code Live Server."
+      : `Backend request failed with HTTP ${response.status}.`;
+    throw new Error(payload.error || fallback);
   }
+  return payload;
 }
 
 function saveData() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state.data));
-}
-
-function seedDemoUser() {
-  if (state.data.users.length > 0) return;
-
-  const userId = crypto.randomUUID();
-  const moveId = crypto.randomUUID();
-  const containerId = crypto.randomUUID();
-  const itemId = crypto.randomUUID();
-  const photoId = crypto.randomUUID();
-
-  state.data.users.push({
-    id: userId,
-    name: "Demo Customer",
-    email: "demo@moveledger.app",
-    password: "demo1234",
-    createdAt: new Date().toISOString(),
-  });
-
-  state.data.moves.push({
-    id: moveId,
-    userId,
-    name: "Sample Military Move",
-    origin: "Fort Carson, CO",
-    destination: "Norfolk, VA",
-    moveDate: new Date().toISOString().slice(0, 10),
-    status: "Packing",
-    createdAt: new Date().toISOString(),
-  });
-
-  state.data.containers.push({
-    id: containerId,
-    moveId,
-    userId,
-    name: "Kitchen Bin 01",
-    location: "Garage staging wall",
-    type: "Plastic tote",
-    notes: "Fragile dishware and coffee setup",
-    qrValue: `moveledger://${moveId}/${containerId}`,
-    createdAt: new Date().toISOString(),
-  });
-
-  state.data.items.push({
-    id: itemId,
-    containerId,
-    moveId,
-    userId,
-    name: "Pour-over coffee kit",
-    quantity: 1,
-    room: "Kitchen",
-    notes: "Glass dripper wrapped in towels",
-    source: "Manual",
-    status: "Packed",
-    createdAt: new Date().toISOString(),
-  });
-
-  state.data.photos.push({
-    id: photoId,
-    containerId,
-    moveId,
-    userId,
-    caption: "Demo inventory photo",
-    dataUrl:
-      "data:image/svg+xml;base64," +
-      btoa(`<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480">
-        <rect width="100%" height="100%" fill="#efe5d8"/>
-        <rect x="80" y="90" width="480" height="300" rx="24" fill="#fffdfa" stroke="#c6b39b"/>
-        <rect x="126" y="146" width="150" height="130" rx="16" fill="#d9b48f"/>
-        <rect x="310" y="126" width="180" height="180" rx="20" fill="#8db6a0"/>
-        <text x="320" y="355" font-family="Arial" font-size="28" fill="#5c4e42">Sample photo record</text>
-      </svg>`),
-    aiSummary: "Suggested inventory: coffee kit, mugs, small kitchen tools.",
-    createdAt: new Date().toISOString(),
-  });
-
-  saveData();
+  if (!state.currentUserId) return;
+  const snapshot = JSON.stringify(state.data);
+  state.savePromise = state.savePromise
+    .catch(() => undefined)
+    .then(() => apiRequest("/api/data", { method: "PUT", body: snapshot }))
+    .catch((error) => {
+      console.error("Move data could not be saved.", error);
+      window.alert(`Your latest change could not be saved: ${error.message}`);
+    });
 }
 
 function toggleAuthMode() {
@@ -148,59 +82,40 @@ function toggleAuthMode() {
   renderAuth();
 }
 
-function handleAuthSubmit(event) {
+async function handleAuthSubmit(event) {
   event.preventDefault();
   const email = elements.authEmail.value.trim().toLowerCase();
   const password = elements.authPassword.value.trim();
   const name = elements.authName.value.trim();
 
-  if (state.authMode === "register") {
-    if (!name) {
-      window.alert("Please enter a full name.");
-      return;
-    }
-    if (state.data.users.some((user) => user.email === email)) {
-      window.alert("An account already exists for that email.");
-      return;
-    }
-
-    const user = {
-      id: crypto.randomUUID(),
-      name,
-      email,
-      password,
-      createdAt: new Date().toISOString(),
-    };
-
-    state.data.users.push(user);
-    setSession(user.id);
-  } else {
-    const user = state.data.users.find(
-      (candidate) => candidate.email === email && candidate.password === password,
-    );
-
-    if (!user) {
-      window.alert("Invalid login. Try demo@moveledger.app / demo1234 to explore.");
-      return;
-    }
-
-    setSession(user.id);
+  elements.authSubmit.disabled = true;
+  elements.authSubmit.textContent = state.authMode === "register" ? "Creating..." : "Signing in...";
+  try {
+    const endpoint = state.authMode === "register" ? "/api/auth/register" : "/api/auth/login";
+    const result = await apiRequest(endpoint, {
+      method: "POST",
+      body: JSON.stringify({ name, email, password }),
+    });
+    setCustomerState(result.user, result.data);
+    elements.authForm.reset();
+    render();
+  } catch (error) {
+    window.alert(error.message);
+    renderAuth();
+  } finally {
+    elements.authSubmit.disabled = false;
   }
-
-  elements.authForm.reset();
-  render();
 }
 
-function setSession(userId) {
-  state.currentUserId = userId;
-  state.data.sessionUserId = userId;
-  saveData();
-}
-
-function handleLogout() {
+async function handleLogout() {
+  await state.savePromise;
+  try {
+    await apiRequest("/api/auth/logout", { method: "POST", body: "{}" });
+  } catch (error) {
+    console.warn("Logout request failed.", error);
+  }
   state.currentUserId = null;
-  state.data.sessionUserId = null;
-  saveData();
+  state.data = emptyData();
   render();
 }
 
@@ -241,8 +156,8 @@ function renderWorkspace() {
       <div class="empty-state">
         <h3>Sign in to start a move record</h3>
         <p>
-          Use the demo account or create your own. This MVP stores data in the browser,
-          so it’s a safe place to shape the workflow before adding a secure backend.
+          Use the demo account or create your own. Each account has a private move history
+          that remains available when the customer returns.
         </p>
       </div>
     `;
@@ -618,8 +533,8 @@ function buildContainerCard(container) {
       <section class="card">
         <div class="card__header">
           <div>
-            <p class="eyebrow">Printable Labels</p>
-            <h3>QR labels for scanning and paper records</h3>
+            <p class="eyebrow">Inventory Document</p>
+            <h3>Itemized records for claims and handoffs</h3>
           </div>
         </div>
         <div class="labels-grid">
@@ -683,16 +598,18 @@ function buildPhotoCard(photo) {
 }
 
 function buildLabelCard(container) {
+  const itemCount = state.data.items.filter((item) => item.containerId === container.id).length;
+  const photoCount = state.data.photos.filter((photo) => photo.containerId === container.id).length;
   return `
     <article class="label-card" id="label-${container.id}">
-      <div class="qr-frame" id="print-qr-${container.id}" data-qr-value="${escapeHtml(container.qrValue)}"></div>
       <div>
         <h5>${escapeHtml(container.name)}</h5>
         <p class="label-card__meta">${escapeHtml(container.type)} • ${escapeHtml(container.location)}</p>
         <p class="label-card__meta">${escapeHtml(container.notes || "No notes")}</p>
+        <p class="label-card__meta">${itemCount} item${itemCount === 1 ? "" : "s"} &bull; ${photoCount} photo${photoCount === 1 ? "" : "s"}</p>
         <div class="label-card__actions">
-          <button class="primary-button" type="button" data-action="print-label" data-container-id="${container.id}">
-            Print Label
+          <button class="primary-button" type="button" data-action="print-inventory" data-container-id="${container.id}">
+            Print / Save PDF
           </button>
         </div>
       </div>
@@ -721,8 +638,8 @@ function wireMoveDetailEvents(moveId) {
     button.addEventListener("click", () => relocateItem(button.dataset.itemId));
   });
 
-  document.querySelectorAll('[data-action="print-label"]').forEach((button) => {
-    button.addEventListener("click", () => printLabel(button.dataset.containerId));
+  document.querySelectorAll('[data-action="print-inventory"]').forEach((button) => {
+    button.addEventListener("click", () => printInventory(button.dataset.containerId));
   });
 
   document.querySelectorAll('[data-action="run-demo-ai"]').forEach((button) => {
@@ -735,7 +652,6 @@ function hydrateMoveDetailQr(moveId) {
     .filter((record) => record.moveId === moveId)
     .forEach((container) => {
       renderQr(`qr-${container.id}`, container.qrValue);
-      renderQr(`print-qr-${container.id}`, container.qrValue);
     });
 }
 
@@ -1003,44 +919,110 @@ function removeItem(itemId) {
   render();
 }
 
-function printLabel(containerId) {
+function printInventory(containerId) {
   const container = state.data.containers.find((record) => record.id === containerId);
-  const label = document.querySelector(`#label-${CSS.escape(containerId)}`).outerHTML;
-  const printWindow = window.open("", "_blank", "width=800,height=600");
+  const move = state.data.moves.find((record) => record.id === container.moveId);
+  const items = state.data.items.filter((record) => record.containerId === containerId);
+  const photos = state.data.photos.filter((record) => record.containerId === containerId);
+  const totalQuantity = items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+  const printWindow = window.open("", "_blank", "width=960,height=780");
 
   if (!printWindow) {
-    window.alert("Please allow pop-ups to print the QR label.");
+    window.alert("Please allow pop-ups to create the inventory PDF.");
     return;
   }
 
+  const itemRows = items
+    .map(
+      (item) => `<tr>
+        <td><strong>${escapeHtml(item.name)}</strong></td>
+        <td>${Number(item.quantity) || 0}</td>
+        <td>${escapeHtml(item.room)}</td>
+        <td>${escapeHtml(item.status)}</td>
+        <td>${escapeHtml(item.notes || "-")}</td>
+      </tr>`,
+    )
+    .join("");
+  const photoCards = photos
+    .map(
+      (photo) => `<figure>
+        <img src="${photo.dataUrl}" alt="${escapeHtml(photo.caption || "Container contents")}" />
+        <figcaption>${escapeHtml(photo.caption || "Container contents")}</figcaption>
+      </figure>`,
+    )
+    .join("");
+
   printWindow.document.write(`
-    <html>
+    <!doctype html>
+    <html lang="en">
       <head>
-        <title>${escapeHtml(container.name)} QR Label</title>
+        <meta charset="UTF-8" />
+        <title>${escapeHtml(container.name)} Inventory</title>
         <style>
-          body { font-family: Arial, sans-serif; padding: 32px; }
-          .label-card { display: grid; grid-template-columns: 160px 1fr; gap: 20px; align-items: center; border: 1px solid #ddd; border-radius: 18px; padding: 24px; }
-          .qr-frame { width: 124px; height: 124px; }
-          .label-card__meta { color: #555; margin: 8px 0; }
+          @page { size: letter; margin: 0.55in; }
+          * { box-sizing: border-box; }
+          body { margin: 0; color: #1d1a17; font: 12px/1.45 Arial, sans-serif; }
+          header { display: grid; grid-template-columns: 1fr 112px; gap: 28px; align-items: start; padding-bottom: 20px; border-bottom: 3px solid #bf5a36; }
+          .brand { margin: 0 0 5px; color: #8f3f24; font-size: 11px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
+          h1 { margin: 0; font-size: 27px; line-height: 1.15; }
+          .subtitle { margin: 8px 0 0; color: #62574e; }
+          .qr { width: 104px; height: 104px; padding: 6px; border: 1px solid #d9cec2; }
+          .meta { display: grid; grid-template-columns: repeat(4, 1fr); margin: 20px 0; border: 1px solid #d9cec2; }
+          .meta div { min-height: 62px; padding: 10px 12px; border-right: 1px solid #d9cec2; }
+          .meta div:last-child { border-right: 0; }
+          .label { display: block; margin-bottom: 4px; color: #76695e; font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+          .summary { display: flex; gap: 22px; margin: 0 0 12px; color: #62574e; }
+          table { width: 100%; border-collapse: collapse; }
+          th { padding: 9px 8px; background: #f2e7da; color: #5f2d1d; font-size: 9px; letter-spacing: .08em; text-align: left; text-transform: uppercase; }
+          td { padding: 9px 8px; border-bottom: 1px solid #e3dad1; vertical-align: top; }
+          th:nth-child(2), td:nth-child(2) { width: 48px; text-align: center; }
+          .empty { padding: 20px; color: #76695e; text-align: center; border: 1px dashed #cbbcae; }
+          h2 { margin: 24px 0 10px; font-size: 16px; }
+          .photos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+          figure { margin: 0; break-inside: avoid; }
+          figure img { display: block; width: 100%; height: 132px; object-fit: cover; border: 1px solid #d9cec2; }
+          figcaption { padding-top: 5px; color: #62574e; font-size: 10px; }
+          footer { margin-top: 24px; padding-top: 10px; border-top: 1px solid #d9cec2; color: #76695e; font-size: 9px; }
         </style>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
       </head>
-      <body>${label}</body>
+      <body>
+        <header>
+          <div>
+            <p class="brand">MoveLedger Inventory Record</p>
+            <h1>${escapeHtml(container.name)}</h1>
+            <p class="subtitle">${escapeHtml(move?.name || "Move record")} &middot; ${escapeHtml(move?.origin || "Origin not set")} to ${escapeHtml(move?.destination || "Destination not set")}</p>
+          </div>
+          <div id="document-qr" class="qr" aria-label="Container QR code"></div>
+        </header>
+        <section class="meta">
+          <div><span class="label">Container</span><strong>${escapeHtml(container.type)}</strong></div>
+          <div><span class="label">Location</span><strong>${escapeHtml(container.location)}</strong></div>
+          <div><span class="label">Move date</span><strong>${formatDate(move?.moveDate)}</strong></div>
+          <div><span class="label">Status</span><strong>${escapeHtml(move?.status || "Active")}</strong></div>
+        </section>
+        <p class="summary"><span><strong>${items.length}</strong> line items</span><span><strong>${totalQuantity}</strong> total units</span><span><strong>${photos.length}</strong> photos</span></p>
+        ${container.notes ? `<p><strong>Container notes:</strong> ${escapeHtml(container.notes)}</p>` : ""}
+        <h2>Itemized Contents</h2>
+        ${items.length ? `<table><thead><tr><th>Item</th><th>Qty</th><th>Room / Category</th><th>Status</th><th>Notes</th></tr></thead><tbody>${itemRows}</tbody></table>` : `<div class="empty">No items have been logged for this container.</div>`}
+        ${photos.length ? `<h2>Photo Evidence</h2><section class="photos">${photoCards}</section>` : ""}
+        <footer>Generated ${escapeHtml(new Date().toLocaleString())} &middot; Record ID ${escapeHtml(container.id)}</footer>
+      </body>
     </html>
   `);
   printWindow.document.close();
   printWindow.onload = () => {
-    const target = printWindow.document.querySelector(`#print-qr-${containerId}`);
-    new printWindow.QRCode(target, {
+    new printWindow.QRCode(printWindow.document.querySelector("#document-qr"), {
       text: container.qrValue,
-      width: 124,
-      height: 124,
+      width: 90,
+      height: 90,
       colorDark: "#111111",
       colorLight: "#ffffff",
     });
-
-    printWindow.focus();
-    printWindow.print();
+    window.setTimeout(() => {
+      printWindow.focus();
+      printWindow.print();
+    }, 150);
   };
 }
 

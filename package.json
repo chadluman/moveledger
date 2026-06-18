@@ -3,8 +3,14 @@
   "version": "1.0.0",
   "private": true,
   "description": "VS Code-ready static MVP for a moving inventory app with QR labels and AI-assisted item logging.",
+  "engines": {
+    "node": ">=20.19.0"
+  },
   "scripts": {
     "start": "node server.js",
     "serve": "node server.js"
+  },
+  "dependencies": {
+    "mongodb": "^7.3.0"
   }
 }
